@@ -1,4 +1,5 @@
 use std::iter::repeat_with;
+use std::iter::Iterator;
 use std::{cmp, io};
 
 struct Bound {
@@ -69,16 +70,10 @@ impl Path {
 }
 
 fn get_common_bounds(bounds0: (Bound, Bound), bounds1: (Bound, Bound)) -> (Bound, Bound) {
-    let mut common_bounds = bounds0;
-    common_bounds.0 = common_bounds
-        .0
-        .extend_to(bounds1.0.min)
-        .extend_to(bounds1.0.max);
-    common_bounds.1 = common_bounds
-        .1
-        .extend_to(bounds1.1.min)
-        .extend_to(bounds1.1.max);
-    common_bounds
+    (
+        bounds0.0.extend_to(bounds1.0.min).extend_to(bounds1.0.max),
+        bounds0.1.extend_to(bounds1.1.min).extend_to(bounds1.1.max),
+    )
 }
 
 struct Grid {
@@ -97,53 +92,42 @@ impl Grid {
         Grid { origin, data }
     }
 
-    fn trace_path(&mut self, i: usize, path: &Path) -> Vec<(i32, i32)> {
-        assert!(i < 32);
-        let path_mask = 1 << i;
+    fn point_data(&mut self, point: (i32, i32)) -> &mut u32 {
+        &mut self.data[(point.0 + self.origin.0) as usize][(point.1 + self.origin.1) as usize]
+    }
 
-        let mut intersections: Vec<(i32, i32)> = Vec::new();
-        let mut i = self.origin.0;
-        let mut j = self.origin.1;
+    fn iterate<Iter: Iterator<Item = (i32, i32)>>(
+        &mut self,
+        func: &mut dyn FnMut((i32, i32), &mut u32),
+        iter: Iter,
+    ) {
+        for point in iter {
+            func(point, &mut self.point_data(point));
+        }
+    }
+
+    fn trace_path(&mut self, path: &Path, func: &mut dyn FnMut((i32, i32), &mut u32)) {
+        let mut i = 0;
+        let mut j = 0;
         for (dir, steps) in path.path.iter() {
             match dir {
                 Dir::Horizontal => {
-                    let range = if *steps >= 0 {
-                        (1..steps + 1)
+                    if *steps >= 0 {
+                        self.iterate(func, (1..steps + 1).map(|di| (i + di, j)));
                     } else {
-                        (*steps..0)
-                    };
-                    for di in range {
-                        let i1 = (i + di) as usize;
-                        let j1 = j as usize;
-                        intersections.extend(self.mark_point(i1, j1, path_mask).iter());
+                        self.iterate(func, (-1..steps - 1).map(|di| (i + di, j)));
                     }
                     i += steps;
                 }
                 Dir::Vertical => {
-                    let range = if *steps >= 0 {
-                        (1..steps + 1)
+                    if *steps >= 0 {
+                        self.iterate(func, (1..steps + 1).map(|dj| (i, j + dj)));
                     } else {
-                        (*steps..0)
+                        self.iterate(func, (*steps..0).map(|dj| (i, j + dj)));
                     };
-                    for dj in range {
-                        let i1 = i as usize;
-                        let j1 = (j + dj) as usize;
-                        intersections.extend(self.mark_point(i1, j1, path_mask).iter());
-                    }
                     j += steps;
                 }
             }
-        }
-        intersections
-    }
-
-    fn mark_point(&mut self, i: usize, j: usize, mask: u32) -> Option<(i32, i32)> {
-        self.data[i][j] |= mask;
-        let res_mask = self.data[i][j];
-        if res_mask & !mask != 0 {
-            Some((i as i32 - self.origin.0, j as i32 - self.origin.1))
-        } else {
-            None
         }
     }
 }
@@ -153,12 +137,24 @@ fn solve1() -> Option<i32> {
     let path1 = Path::read_path();
     let bounds = get_common_bounds(path0.get_bounds(), path1.get_bounds());
     let mut grid = Grid::new(bounds);
-    grid.trace_path(0, &path0);
-    let min_distance = grid
-        .trace_path(1, &path1)
-        .iter()
-        .map(|point| point.0.abs() + point.1.abs())
-        .min();
+
+    let mut counter: u32 = 0;
+    grid.trace_path(&path0, &mut |_, value| {
+        counter += 1;
+        if *value == 0 {
+            *value = counter;
+        }
+    });
+    let mut min_distance = None;
+    grid.trace_path(&path1, &mut |point, &mut value| {
+        if value != 0 {
+            let dist = point.0.abs() + point.1.abs();
+            min_distance = match min_distance {
+                None => Some(dist),
+                Some(dist0) => Some(cmp::min(dist0, dist)),
+            };
+        }
+    });
     return min_distance;
 }
 
