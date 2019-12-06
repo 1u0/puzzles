@@ -115,7 +115,7 @@ impl Grid {
                     if *steps >= 0 {
                         self.iterate(func, (1..steps + 1).map(|di| (i + di, j)));
                     } else {
-                        self.iterate(func, (-1..steps - 1).map(|di| (i + di, j)));
+                        self.iterate(func, (*steps..0).rev().map(|di| (i + di, j)));
                     }
                     i += steps;
                 }
@@ -123,7 +123,7 @@ impl Grid {
                     if *steps >= 0 {
                         self.iterate(func, (1..steps + 1).map(|dj| (i, j + dj)));
                     } else {
-                        self.iterate(func, (*steps..0).map(|dj| (i, j + dj)));
+                        self.iterate(func, (*steps..0).rev().map(|dj| (i, j + dj)));
                     };
                     j += steps;
                 }
@@ -132,32 +132,47 @@ impl Grid {
     }
 }
 
-fn solve1() -> Option<i32> {
+fn solve(dist_func: &mut dyn FnMut((i32, i32), u32, u32) -> i32) -> Option<i32> {
     let path0 = Path::read_path();
     let path1 = Path::read_path();
     let bounds = get_common_bounds(path0.get_bounds(), path1.get_bounds());
     let mut grid = Grid::new(bounds);
 
-    let mut counter: u32 = 0;
-    grid.trace_path(&path0, &mut |_, value| {
-        counter += 1;
-        if *value == 0 {
-            *value = counter;
-        }
-    });
+    {
+        let mut counter: u32 = 0;
+        grid.trace_path(&path0, &mut |_, value| {
+            counter += 1;
+            if *value == 0 {
+                *value = counter;
+            }
+        });
+    }
+
     let mut min_distance = None;
-    grid.trace_path(&path1, &mut |point, &mut value| {
-        if value != 0 {
-            let dist = point.0.abs() + point.1.abs();
-            min_distance = match min_distance {
-                None => Some(dist),
-                Some(dist0) => Some(cmp::min(dist0, dist)),
-            };
-        }
-    });
+    {
+        let mut counter: u32 = 0;
+        grid.trace_path(&path1, &mut |point, &mut value| {
+            counter += 1;
+            if value != 0 {
+                let dist = dist_func(point, value, counter);
+                min_distance = match min_distance {
+                    None => Some(dist),
+                    Some(dist0) => Some(cmp::min(dist0, dist)),
+                };
+            }
+        });
+    }
     return min_distance;
 }
 
+fn solve1() -> Option<i32> {
+    solve(&mut |point, _, _| point.0.abs() + point.1.abs())
+}
+
+fn solve2() -> Option<i32> {
+    solve(&mut |_, value0, value1| (value0 + value1) as i32)
+}
+
 fn main() {
-    println!("Result: {:?}", solve1());
+    println!("Result: {:?}", solve2());
 }
