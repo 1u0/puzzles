@@ -1,5 +1,9 @@
 use std::io;
 
+fn input_func() -> i32 {
+    panic!("unexpected input request");
+}
+
 fn reset(code: &mut Vec<i32>, noun: i32, verb: i32) {
     code[1] = noun;
     code[2] = verb;
@@ -15,7 +19,7 @@ fn load_code() -> Vec<i32> {
 fn solve1() -> Result<i32, &'static str> {
     let mut code = load_code();
     reset(&mut code, 12, 2);
-    let code = intcode::run_code(code)?;
+    let code = intcode::run_code(code, &mut input_func)?;
     Ok(code[0])
 }
 
@@ -24,7 +28,7 @@ fn solve2() -> Result<i32, &'static str> {
     for noun in 0..100 {
         for verb in 0..100 {
             reset(&mut code, noun, verb);
-            match intcode::run_code(code.to_vec()) {
+            match intcode::run_code(code.to_vec(), &mut input_func) {
                 Err(_) => (),
                 Ok(res) => {
                     if res[0] == 19690720 {
