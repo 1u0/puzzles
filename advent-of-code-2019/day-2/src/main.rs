@@ -1,102 +1,30 @@
 use std::io;
 
-const OPCODE_ADD: u32 = 1;
-const OPCODE_MULTIPLY: u32 = 2;
-const OPCODE_STOP: u32 = 99;
-
-struct Code(Vec<u32>);
-
-impl Code {
-    fn read_ref(&self, ip: usize) -> Result<u32, &'static str> {
-        let pos = self.0[ip] as usize;
-        if pos >= self.0.len() {
-            Err("Index out of bound")
-        } else {
-            Ok(self.0[pos])
-        }
-    }
-
-    fn write_ref(&mut self, ip: usize, value: u32) -> Result<(), &'static str> {
-        let pos = self.0[ip] as usize;
-        if pos >= self.0.len() {
-            Err("Index out of bound")
-        } else {
-            self.0[pos] = value;
-            Ok(())
-        }
-    }
-
-    fn run(mut self) -> Result<Vec<u32>, &'static str> {
-        let mut i: usize = 0;
-        let l = self.0.len();
-        while i < l {
-            match self.0[i] {
-                OPCODE_ADD => {
-                    if i + 3 >= l {
-                        return Err("End of input.");
-                    }
-                    let val0 = self.read_ref(i + 1)?;
-                    let val1 = self.read_ref(i + 2)?;
-                    self.write_ref(i + 3, val0 + val1)?;
-                    i += 4;
-                }
-                OPCODE_MULTIPLY => {
-                    if i + 3 >= l {
-                        return Err("End of input.");
-                    }
-                    let val0 = self.read_ref(i + 1)?;
-                    let val1 = self.read_ref(i + 2)?;
-                    self.write_ref(i + 3, val0 * val1)?;
-                    i += 4;
-                }
-                OPCODE_STOP => {
-                    break;
-                }
-                _ => {
-                    return Err("Unknown opcode");
-                }
-            }
-        }
-        Ok(self.0)
-    }
-}
-
-fn run_code(code: Vec<u32>) -> Result<Vec<u32>, &'static str> {
-    Code(code).run()
-}
-
-fn reset(code: &mut Vec<u32>, noun: u32, verb: u32) {
+fn reset(code: &mut Vec<i32>, noun: i32, verb: i32) {
     code[1] = noun;
     code[2] = verb;
 }
-fn reset_12_02(code: &mut Vec<u32>) {
-    reset(code, 12, 2);
-}
 
-fn load_code() -> Vec<u32> {
+fn load_code() -> Vec<i32> {
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
 
-    input
-        .trim()
-        .split(",")
-        .map(|str| str.parse().unwrap())
-        .collect()
+    intcode::parse_code(&input)
 }
 
-fn solve1() -> Result<u32, &'static str> {
+fn solve1() -> Result<i32, &'static str> {
     let mut code = load_code();
-    reset_12_02(&mut code);
-    let code = run_code(code)?;
+    reset(&mut code, 12, 2);
+    let code = intcode::run_code(code)?;
     Ok(code[0])
 }
 
-fn solve2() -> Result<u32, &'static str> {
+fn solve2() -> Result<i32, &'static str> {
     let mut code = load_code();
     for noun in 0..100 {
         for verb in 0..100 {
             reset(&mut code, noun, verb);
-            match run_code(code.to_vec()) {
+            match intcode::run_code(code.to_vec()) {
                 Err(_) => (),
                 Ok(res) => {
                     if res[0] == 19690720 {
