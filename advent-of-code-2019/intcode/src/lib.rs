@@ -69,27 +69,43 @@ fn parse_instruction(instruction: Byte) -> (Opcode, Modes) {
 
 type RuntimeError = &'static str;
 
-pub struct Code {
+pub struct Intcode {
     code: Vec<Byte>,
     relative_base: Byte,
 }
 
-impl Code {
+impl Intcode {
     fn new(code: Vec<Byte>) -> Self {
-        Code {
+        Intcode {
             code,
             relative_base: 0,
         }
     }
 
-    fn is_valid_index(&self, i: Byte) -> bool {
-        0 <= i && i < self.code.len() as Byte
+    fn ensure_memory(&mut self, i: usize) {
+        let min_len = i + 1;
+        if min_len > self.code.len() {
+            println!(
+                "Resizing the memory from {} to {}",
+                self.code.len(),
+                min_len
+            );
+            self.code.resize(min_len, 0);
+        }
     }
 
-    fn get_pos(&self, ip: usize, mode: Mode) -> Result<usize, RuntimeError> {
+    fn is_valid_index(&self, i: Byte) -> bool {
+        0 <= i
+    }
+
+    fn get_pos(&mut self, ip: usize, mode: Mode) -> Result<usize, RuntimeError> {
         match mode {
-            Mode::Immediate => Ok(ip),
+            Mode::Immediate => {
+                self.ensure_memory(ip);
+                Ok(ip)
+            },
             Mode::Position | Mode::Relative => {
+                self.ensure_memory(ip);
                 let mut pos = self.code[ip];
                 if mode == Mode::Relative {
                     pos += self.relative_base;
@@ -103,13 +119,15 @@ impl Code {
         }
     }
 
-    fn read_ref(&self, ip: usize, mode: Mode) -> Result<Byte, RuntimeError> {
+    fn read_ref(&mut self, ip: usize, mode: Mode) -> Result<Byte, RuntimeError> {
         let pos = self.get_pos(ip, mode)?;
+        self.ensure_memory(pos);
         Ok(self.code[pos])
     }
 
     fn write_ref(&mut self, ip: usize, mode: Mode, value: Byte) -> Result<(), RuntimeError> {
         let pos = self.get_pos(ip, mode)?;
+        self.ensure_memory(pos);
         self.code[pos] = value;
         Ok(())
     }
@@ -120,23 +138,17 @@ impl Code {
         output_func: &mut dyn FnMut(Byte),
     ) -> Result<Vec<Byte>, RuntimeError> {
         let mut i: usize = 0;
-        let l = self.code.len();
-        while i < l {
+        loop {
+            self.ensure_memory(i);
             let (opcode, mut modes) = parse_instruction(self.code[i]);
             match opcode {
                 Opcode::Add => {
-                    if i + 3 >= l {
-                        return Err("End of input.");
-                    }
                     let val0 = self.read_ref(i + 1, modes.next())?;
                     let val1 = self.read_ref(i + 2, modes.next())?;
                     self.write_ref(i + 3, modes.next(), val0 + val1)?;
                     i += 4;
                 }
                 Opcode::Multiply => {
-                    if i + 3 >= l {
-                        return Err("End of input.");
-                    }
                     let val0 = self.read_ref(i + 1, modes.next())?;
                     let val1 = self.read_ref(i + 2, modes.next())?;
                     self.write_ref(i + 3, modes.next(), val0 * val1)?;
@@ -200,7 +212,6 @@ impl Code {
                 }
             }
         }
-        Err("Unexpected program termination")
     }
 }
 
@@ -209,7 +220,7 @@ pub fn run_code(
     input_func: &mut dyn FnMut() -> Byte,
     output_func: &mut dyn FnMut(Byte),
 ) -> Result<Vec<Byte>, RuntimeError> {
-    Code::new(code).run(input_func, output_func)
+    Intcode::new(code).run(input_func, output_func)
 }
 
 pub fn parse_code(input: &str) -> Vec<Byte> {
@@ -327,7 +338,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // the execution doesn't support dynamic memory grow
     fn test_a_quine_program() {
         let code = vec![
             109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99,
