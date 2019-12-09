@@ -1,5 +1,4 @@
 use intcode::Byte;
-use std::io;
 
 fn input_func() -> Byte {
     panic!("unexpected input request");
@@ -14,26 +13,19 @@ fn reset(code: &mut Vec<Byte>, noun: Byte, verb: Byte) {
     code[2] = verb;
 }
 
-fn load_code() -> Vec<Byte> {
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
-
-    intcode::parse_code(&input)
-}
-
 fn run_code(code: Vec<Byte>) -> Result<Vec<Byte>, &'static str> {
     intcode::run_code(code, &mut input_func, &mut output_func)
 }
 
 fn solve1() -> Result<Byte, &'static str> {
-    let mut code = load_code();
+    let mut code = intcode::load_code();
     reset(&mut code, 12, 2);
     let code = run_code(code)?;
     Ok(code[0])
 }
 
 fn solve2() -> Result<Byte, &'static str> {
-    let mut code = load_code();
+    let mut code = intcode::load_code();
     for noun in 0..100 {
         for verb in 0..100 {
             reset(&mut code, noun, verb);

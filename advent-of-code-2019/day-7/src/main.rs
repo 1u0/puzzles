@@ -1,15 +1,8 @@
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use permutohedron::Heap;
 use std::cmp;
-use std::io;
 use std::thread::JoinHandle;
 use intcode::Byte;
-
-fn load_code() -> Vec<Byte> {
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
-    intcode::parse_code(&input)
-}
 
 fn run_code(code: Vec<Byte>, inputs: Vec<Byte>) -> Vec<Byte> {
     let mut inputs = inputs;
@@ -69,10 +62,10 @@ fn run_circuit_2(code: &Vec<Byte>, phase_setting: &Vec<Byte>) -> Byte {
 }
 
 fn solve1() {
-    let code = load_code();
-    let mut phases: Vec<i32> = (0..5).collect();
+    let code = intcode::load_code();
+    let mut phases: Vec<Byte> = (0..5).collect();
     let all_phase_settings = Heap::new(&mut phases);
-    let mut max_output = std::i32::MIN;
+    let mut max_output = Byte::min_value();
     for phase_setting in all_phase_settings {
         max_output = cmp::max(max_output, run_circuit(&code, &phase_setting));
     }
@@ -80,10 +73,10 @@ fn solve1() {
 }
 
 fn solve2() {
-    let code = load_code();
+    let code = intcode::load_code();
     let mut phases: Vec<Byte> = (5..10).collect();
     let all_phase_settings = Heap::new(&mut phases);
-    let mut max_output = std::i32::MIN;
+    let mut max_output = Byte::min_value();
     for phase_setting in all_phase_settings {
         max_output = cmp::max(max_output, run_circuit_2(&code, &phase_setting));
     }

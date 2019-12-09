@@ -1,3 +1,5 @@
+use std::io;
+
 pub type Byte = i64;
 
 enum Opcode {
@@ -229,6 +231,12 @@ pub fn parse_code(input: &str) -> Vec<Byte> {
         .split(",")
         .map(|str| str.parse().unwrap())
         .collect()
+}
+
+pub fn load_code() -> Vec<Byte> {
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    parse_code(&input)
 }
 
 #[cfg(test)]
