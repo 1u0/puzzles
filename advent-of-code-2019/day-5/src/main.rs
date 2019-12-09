@@ -1,12 +1,13 @@
+use intcode::Byte;
 use std::io;
 
-fn load_code() -> Vec<i32> {
+fn load_code() -> Vec<Byte> {
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
     intcode::parse_code(&input)
 }
 
-fn run_code(code: Vec<i32>, inputs: Vec<i32>) -> Vec<i32> {
+fn run_code(code: Vec<Byte>, inputs: Vec<Byte>) -> Vec<Byte> {
     let mut inputs = inputs;
     let mut outputs = Vec::new();
     assert!(intcode::run_code(

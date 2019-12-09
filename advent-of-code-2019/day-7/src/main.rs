@@ -3,14 +3,15 @@ use permutohedron::Heap;
 use std::cmp;
 use std::io;
 use std::thread::JoinHandle;
+use intcode::Byte;
 
-fn load_code() -> Vec<i32> {
+fn load_code() -> Vec<Byte> {
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
     intcode::parse_code(&input)
 }
 
-fn run_code(code: Vec<i32>, inputs: Vec<i32>) -> Vec<i32> {
+fn run_code(code: Vec<Byte>, inputs: Vec<Byte>) -> Vec<Byte> {
     let mut inputs = inputs;
     let mut outputs = Vec::new();
     assert!(
@@ -22,7 +23,7 @@ fn run_code(code: Vec<i32>, inputs: Vec<i32>) -> Vec<i32> {
     outputs
 }
 
-fn run_circuit(code: &Vec<i32>, phase_setting: &Vec<i32>) -> i32 {
+fn run_circuit(code: &Vec<Byte>, phase_setting: &Vec<Byte>) -> Byte {
     let mut input = vec![0];
     for phase in phase_setting {
         input.push(*phase);
@@ -32,7 +33,7 @@ fn run_circuit(code: &Vec<i32>, phase_setting: &Vec<i32>) -> i32 {
     input[0]
 }
 
-fn run_amp(code: Vec<i32>, input: &Receiver<i32>, output: &Sender<i32>) -> JoinHandle<()> {
+fn run_amp(code: Vec<Byte>, input: &Receiver<Byte>, output: &Sender<Byte>) -> JoinHandle<()> {
     let input = input.clone();
     let output = output.clone();
     ::std::thread::spawn(move || {
@@ -45,7 +46,7 @@ fn run_amp(code: Vec<i32>, input: &Receiver<i32>, output: &Sender<i32>) -> JoinH
     })
 }
 
-fn run_circuit_2(code: &Vec<i32>, phase_setting: &Vec<i32>) -> i32 {
+fn run_circuit_2(code: &Vec<Byte>, phase_setting: &Vec<Byte>) -> Byte {
     let n = phase_setting.len();
     let mut channels = Vec::new();
     for i in 0..n {
@@ -80,7 +81,7 @@ fn solve1() {
 
 fn solve2() {
     let code = load_code();
-    let mut phases: Vec<i32> = (5..10).collect();
+    let mut phases: Vec<Byte> = (5..10).collect();
     let all_phase_settings = Heap::new(&mut phases);
     let mut max_output = std::i32::MIN;
     for phase_setting in all_phase_settings {

@@ -1,3 +1,5 @@
+pub type Byte = i64;
+
 enum Opcode {
     Add,
     Multiply,
@@ -7,11 +9,12 @@ enum Opcode {
     JumpIfFalse,
     LessThan,
     Equals,
+    UpdateRelativeBase,
     Stop,
 }
 
 impl Opcode {
-    fn from_code(code: i32) -> Opcode {
+    fn from_code(code: Byte) -> Opcode {
         match code {
             1 => Opcode::Add,
             2 => Opcode::Multiply,
@@ -21,6 +24,7 @@ impl Opcode {
             6 => Opcode::JumpIfFalse,
             7 => Opcode::LessThan,
             8 => Opcode::Equals,
+            9 => Opcode::UpdateRelativeBase,
             99 => Opcode::Stop,
             _ => panic!("Unknown opcode: {}", code),
         }
@@ -28,17 +32,19 @@ impl Opcode {
 }
 
 // Parameter mode
+#[derive(PartialEq)]
 enum Mode {
     Position,
     Immediate,
+    Relative,
 }
 
 struct Modes {
-    value: i32,
+    value: Byte,
 }
 
 impl Modes {
-    fn new(value: i32) -> Self {
+    fn new(value: Byte) -> Self {
         Modes { value }
     }
 
@@ -48,12 +54,13 @@ impl Modes {
         match code {
             0 => Mode::Position,
             1 => Mode::Immediate,
+            2 => Mode::Relative,
             _ => panic!("Unknown mode: {}", code),
         }
     }
 }
 
-fn parse_instruction(instruction: i32) -> (Opcode, Modes) {
+fn parse_instruction(instruction: Byte) -> (Opcode, Modes) {
     (
         Opcode::from_code(instruction % 100),
         Modes::new(instruction / 100),
@@ -62,47 +69,60 @@ fn parse_instruction(instruction: i32) -> (Opcode, Modes) {
 
 type RuntimeError = &'static str;
 
-pub struct Code(Vec<i32>);
+pub struct Code {
+    code: Vec<Byte>,
+    relative_base: Byte,
+}
 
 impl Code {
-    fn is_valid_index(&self, i: i32) -> bool {
-        0 <= i && i < self.0.len() as i32
+    fn new(code: Vec<Byte>) -> Self {
+        Code {
+            code,
+            relative_base: 0,
+        }
+    }
+
+    fn is_valid_index(&self, i: Byte) -> bool {
+        0 <= i && i < self.code.len() as Byte
     }
 
     fn get_pos(&self, ip: usize, mode: Mode) -> Result<usize, RuntimeError> {
         match mode {
-            Mode::Position => {
-                let pos = self.0[ip];
+            Mode::Immediate => Ok(ip),
+            Mode::Position | Mode::Relative => {
+                let mut pos = self.code[ip];
+                if mode == Mode::Relative {
+                    pos += self.relative_base;
+                }
                 if !self.is_valid_index(pos) {
                     Err("Index out of bound")
                 } else {
                     Ok(pos as usize)
                 }
             }
-            Mode::Immediate => Ok(ip),
         }
     }
 
-    fn read_ref(&self, ip: usize, mode: Mode) -> Result<i32, RuntimeError> {
+    fn read_ref(&self, ip: usize, mode: Mode) -> Result<Byte, RuntimeError> {
         let pos = self.get_pos(ip, mode)?;
-        Ok(self.0[pos])
+        Ok(self.code[pos])
     }
 
-    fn write_ref(&mut self, ip: usize, mode: Mode, value: i32) -> Result<(), RuntimeError> {
+    fn write_ref(&mut self, ip: usize, mode: Mode, value: Byte) -> Result<(), RuntimeError> {
         let pos = self.get_pos(ip, mode)?;
-        self.0[pos] = value;
+        self.code[pos] = value;
         Ok(())
     }
 
     pub fn run(
         mut self,
-        input_func: &mut dyn FnMut() -> i32,
-        output_func: &mut dyn FnMut(i32),
-    ) -> Result<Vec<i32>, RuntimeError> {
+        input_func: &mut dyn FnMut() -> Byte,
+        output_func: &mut dyn FnMut(Byte),
+    ) -> Result<Vec<Byte>, RuntimeError> {
         let mut i: usize = 0;
-        let l = self.0.len();
+        let l = self.code.len();
         while i < l {
-            let (opcode, mut modes) = parse_instruction(self.0[i]);
+            let (opcode, mut modes) = parse_instruction(self.code[i]);
             match opcode {
                 Opcode::Add => {
                     if i + 3 >= l {
@@ -170,8 +190,13 @@ impl Code {
                     self.write_ref(i + 3, modes.next(), res)?;
                     i += 4;
                 }
+                Opcode::UpdateRelativeBase => {
+                    let val0 = self.read_ref(i + 1, modes.next())?;
+                    self.relative_base += val0;
+                    i += 2;
+                }
                 Opcode::Stop => {
-                    return Ok(self.0);
+                    return Ok(self.code);
                 }
             }
         }
@@ -180,14 +205,14 @@ impl Code {
 }
 
 pub fn run_code(
-    code: Vec<i32>,
-    input_func: &mut dyn FnMut() -> i32,
-    output_func: &mut dyn FnMut(i32),
-) -> Result<Vec<i32>, RuntimeError> {
-    Code(code).run(input_func, output_func)
+    code: Vec<Byte>,
+    input_func: &mut dyn FnMut() -> Byte,
+    output_func: &mut dyn FnMut(Byte),
+) -> Result<Vec<Byte>, RuntimeError> {
+    Code::new(code).run(input_func, output_func)
 }
 
-pub fn parse_code(input: &str) -> Vec<i32> {
+pub fn parse_code(input: &str) -> Vec<Byte> {
     input
         .trim()
         .split(",")
@@ -199,16 +224,16 @@ pub fn parse_code(input: &str) -> Vec<i32> {
 mod tests {
     use super::*;
 
-    fn unexpected_input() -> i32 {
+    fn unexpected_input() -> Byte {
         assert!(false, "unexpected input request");
         unreachable!()
     }
 
-    fn unexpected_output(_value: i32) {
+    fn unexpected_output(_value: Byte) {
         assert!(false, "unexpected output request");
     }
 
-    fn run_code_without_input(code: Vec<i32>) -> Result<Vec<i32>, RuntimeError> {
+    fn run_code_without_input(code: Vec<Byte>) -> Result<Vec<Byte>, RuntimeError> {
         run_code(code, &mut unexpected_input, &mut unexpected_output)
     }
 
@@ -240,7 +265,7 @@ mod tests {
         );
     }
 
-    fn test_run(code: &Vec<i32>, input: Vec<i32>) -> Vec<i32> {
+    fn test_run(code: &Vec<Byte>, input: Vec<Byte>) -> Vec<Byte> {
         let mut input = input;
         let mut output = Vec::new();
         assert!(run_code(
@@ -291,5 +316,22 @@ mod tests {
             assert_eq!(vec![1], test_run(code, vec![8])); // == 8
             assert_eq!(vec![0], test_run(code, vec![42])); // any value != 8
         }
+    }
+
+    #[test]
+    fn test_big_numbers_support() {
+        let code = vec![1102, 34915192, 34915192, 7, 4, 7, 99, 0];
+        assert_eq!(vec![1219070632396864], test_run(&code, Vec::new()));
+        let code = vec![104, 1125899906842624, 99];
+        assert_eq!(vec![code[1]], test_run(&code, Vec::new()));
+    }
+
+    #[test]
+    #[ignore] // the execution doesn't support dynamic memory grow
+    fn test_a_quine_program() {
+        let code = vec![
+            109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99,
+        ];
+        assert_eq!(code, test_run(&code, Vec::new()));
     }
 }

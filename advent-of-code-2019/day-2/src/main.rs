@@ -1,37 +1,38 @@
+use intcode::Byte;
 use std::io;
 
-fn input_func() -> i32 {
+fn input_func() -> Byte {
     panic!("unexpected input request");
 }
 
-fn output_func(_value: i32) {
+fn output_func(_value: Byte) {
     panic!("unexpected output request");
 }
 
-fn reset(code: &mut Vec<i32>, noun: i32, verb: i32) {
+fn reset(code: &mut Vec<Byte>, noun: Byte, verb: Byte) {
     code[1] = noun;
     code[2] = verb;
 }
 
-fn load_code() -> Vec<i32> {
+fn load_code() -> Vec<Byte> {
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
 
     intcode::parse_code(&input)
 }
 
-fn run_code(code: Vec<i32>) -> Result<Vec<i32>, &'static str> {
+fn run_code(code: Vec<Byte>) -> Result<Vec<Byte>, &'static str> {
     intcode::run_code(code, &mut input_func, &mut output_func)
 }
 
-fn solve1() -> Result<i32, &'static str> {
+fn solve1() -> Result<Byte, &'static str> {
     let mut code = load_code();
     reset(&mut code, 12, 2);
     let code = run_code(code)?;
     Ok(code[0])
 }
 
-fn solve2() -> Result<i32, &'static str> {
+fn solve2() -> Result<Byte, &'static str> {
     let mut code = load_code();
     for noun in 0..100 {
         for verb in 0..100 {
