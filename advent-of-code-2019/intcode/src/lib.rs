@@ -2,6 +2,11 @@ use std::io;
 
 pub type Byte = i64;
 
+pub trait Io {
+    fn input(&mut self) -> Byte;
+    fn output(&mut self, value: Byte);
+}
+
 enum Opcode {
     Add,
     Multiply,
@@ -105,7 +110,7 @@ impl Intcode {
             Mode::Immediate => {
                 self.ensure_memory(ip);
                 Ok(ip)
-            },
+            }
             Mode::Position | Mode::Relative => {
                 self.ensure_memory(ip);
                 let mut pos = self.code[ip];
@@ -134,11 +139,7 @@ impl Intcode {
         Ok(())
     }
 
-    pub fn run(
-        mut self,
-        input_func: &mut dyn FnMut() -> Byte,
-        output_func: &mut dyn FnMut(Byte),
-    ) -> Result<Vec<Byte>, RuntimeError> {
+    pub fn run(mut self, io: &mut dyn Io) -> Result<Vec<Byte>, RuntimeError> {
         let mut i: usize = 0;
         loop {
             self.ensure_memory(i);
@@ -157,13 +158,13 @@ impl Intcode {
                     i += 4;
                 }
                 Opcode::Input => {
-                    let input = input_func();
+                    let input = io.input();
                     self.write_ref(i + 1, modes.next(), input)?;
                     i += 2;
                 }
                 Opcode::Output => {
                     let val0 = self.read_ref(i + 1, modes.next())?;
-                    output_func(val0);
+                    io.output(val0);
                     i += 2;
                 }
                 Opcode::JumpIfTrue => {
@@ -217,12 +218,57 @@ impl Intcode {
     }
 }
 
-pub fn run_code(
-    code: Vec<Byte>,
-    input_func: &mut dyn FnMut() -> Byte,
-    output_func: &mut dyn FnMut(Byte),
-) -> Result<Vec<Byte>, RuntimeError> {
-    Intcode::new(code).run(input_func, output_func)
+pub fn run_code(code: Vec<Byte>, io: &mut dyn Io) -> Result<Vec<Byte>, RuntimeError> {
+    Intcode::new(code).run(io)
+}
+
+struct NoIo {}
+
+impl Io for NoIo {
+    fn input(&mut self) -> Byte {
+        assert!(false, "unexpected input request");
+        unreachable!()
+    }
+
+    fn output(&mut self, _: Byte) {
+        assert!(false, "unexpected output request");
+    }
+}
+
+pub fn run_code_without_io(code: Vec<Byte>) -> Result<Vec<Byte>, RuntimeError> {
+    let mut io = NoIo {};
+    run_code(code, &mut io)
+}
+
+struct SimpleIo {
+    input: Vec<Byte>,
+    output: Vec<Byte>,
+}
+
+impl SimpleIo {
+    fn new(input: Vec<Byte>) -> Self {
+        SimpleIo {
+            input,
+            output: Vec::new(),
+        }
+    }
+}
+
+impl Io for SimpleIo {
+    fn input(&mut self) -> Byte {
+        self.input.pop().unwrap()
+    }
+
+    fn output(&mut self, value: Byte) {
+        self.output.push(value);
+    }
+}
+
+pub fn run_code_with_inputs(code: Vec<Byte>, inputs: Vec<Byte>) -> Vec<Byte> {
+    let mut io = SimpleIo::new(inputs);
+    let ok = run_code(code, &mut io).is_ok();
+    assert!(ok);
+    io.output
 }
 
 pub fn parse_code(input: &str) -> Vec<Byte> {
@@ -243,36 +289,23 @@ pub fn load_code() -> Vec<Byte> {
 mod tests {
     use super::*;
 
-    fn unexpected_input() -> Byte {
-        assert!(false, "unexpected input request");
-        unreachable!()
-    }
-
-    fn unexpected_output(_value: Byte) {
-        assert!(false, "unexpected output request");
-    }
-
-    fn run_code_without_input(code: Vec<Byte>) -> Result<Vec<Byte>, RuntimeError> {
-        run_code(code, &mut unexpected_input, &mut unexpected_output)
-    }
-
     #[test]
     fn check_run_code() {
         assert_eq!(
             Ok(vec![2, 0, 0, 0, 99]),
-            run_code_without_input(vec![1, 0, 0, 0, 99])
+            run_code_without_io(vec![1, 0, 0, 0, 99])
         );
         assert_eq!(
             Ok(vec![2, 3, 0, 6, 99]),
-            run_code_without_input(vec![2, 3, 0, 3, 99])
+            run_code_without_io(vec![2, 3, 0, 3, 99])
         );
         assert_eq!(
             Ok(vec![2, 4, 4, 5, 99, 9801]),
-            run_code_without_input(vec![2, 4, 4, 5, 99, 0])
+            run_code_without_io(vec![2, 4, 4, 5, 99, 0])
         );
         assert_eq!(
             Ok(vec![30, 1, 1, 4, 2, 5, 6, 0, 99]),
-            run_code_without_input(vec![1, 1, 1, 4, 99, 5, 6, 0, 99])
+            run_code_without_io(vec![1, 1, 1, 4, 99, 5, 6, 0, 99])
         );
     }
 
@@ -280,22 +313,12 @@ mod tests {
     fn check_run_code_with_immediate_mode() {
         assert_eq!(
             Ok(vec![1002, 4, 3, 4, 99]),
-            run_code_without_input(vec![1002, 4, 3, 4, 33])
+            run_code_without_io(vec![1002, 4, 3, 4, 33])
         );
     }
 
     fn test_run(code: &Vec<Byte>, input: Vec<Byte>) -> Vec<Byte> {
-        let mut input = input;
-        let mut output = Vec::new();
-        assert!(run_code(
-            code.to_vec(),
-            &mut || { input.pop().unwrap() },
-            &mut |value| {
-                output.push(value);
-            }
-        )
-        .is_ok());
-        output
+        run_code_with_inputs(code.to_vec(), input)
     }
 
     #[test]

@@ -1,41 +1,44 @@
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use intcode::Byte;
 use permutohedron::Heap;
 use std::cmp;
 use std::thread::JoinHandle;
-use intcode::Byte;
 
-fn run_code(code: Vec<Byte>, inputs: Vec<Byte>) -> Vec<Byte> {
-    let mut inputs = inputs;
-    let mut outputs = Vec::new();
-    assert!(
-        intcode::run_code(code, &mut || { inputs.pop().unwrap() }, &mut |value| {
-            outputs.push(value)
-        })
-        .is_ok()
-    );
-    outputs
+struct ConcurrentIo {
+    input: Receiver<Byte>,
+    output: Sender<Byte>,
+}
+
+impl ConcurrentIo {
+    fn new(input: Receiver<Byte>, output: Sender<Byte>) -> Self {
+        ConcurrentIo { input, output }
+    }
+}
+
+impl intcode::Io for ConcurrentIo {
+    fn input(&mut self) -> Byte {
+        self.input.recv().unwrap()
+    }
+
+    fn output(&mut self, value: Byte) {
+        self.output.send(value).unwrap();
+    }
 }
 
 fn run_circuit(code: &Vec<Byte>, phase_setting: &Vec<Byte>) -> Byte {
     let mut input = vec![0];
     for phase in phase_setting {
         input.push(*phase);
-        input = run_code(code.to_vec(), input);
+        input = intcode::run_code_with_inputs(code.to_vec(), input);
         assert_eq!(input.len(), 1);
     }
     input[0]
 }
 
 fn run_amp(code: Vec<Byte>, input: &Receiver<Byte>, output: &Sender<Byte>) -> JoinHandle<()> {
-    let input = input.clone();
-    let output = output.clone();
+    let mut io = ConcurrentIo::new(input.clone(), output.clone());
     ::std::thread::spawn(move || {
-        assert!(
-            intcode::run_code(code, &mut || { input.recv().unwrap() }, &mut |value| {
-                output.send(value).unwrap()
-            })
-            .is_ok()
-        );
+        assert!(intcode::run_code(code, &mut io).is_ok());
     })
 }
 
