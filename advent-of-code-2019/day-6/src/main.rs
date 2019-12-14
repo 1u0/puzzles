@@ -62,7 +62,7 @@ fn solve1() {
 
     let idx = map.lookup("COM").unwrap();
     let mut horizon = map.direct_orbits[idx].to_vec();
-    while horizon.len() > 0 {
+    while !horizon.is_empty() {
         depth += 1;
         total_orbits_count += depth * horizon.len();
         horizon = horizon

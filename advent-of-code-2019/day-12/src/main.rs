@@ -118,7 +118,7 @@ fn solve2() {
         let mut iter = 0;
         let mut state = celestians.get_dimension(i);
         loop {
-            if let Some(_) = seen.insert(state.clone(), iter) {
+            if seen.insert(state.clone(), iter).is_some() {
                 periods.push(iter as i64);
                 break;
             }

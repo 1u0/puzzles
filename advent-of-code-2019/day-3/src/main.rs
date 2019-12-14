@@ -43,7 +43,7 @@ impl Path {
 
         let path = input
             .trim()
-            .split(",")
+            .split(',')
             .map(|str| parse_token(str))
             .collect();
 
@@ -113,7 +113,7 @@ impl Grid {
             match dir {
                 Dir::Horizontal => {
                     if *steps >= 0 {
-                        self.iterate(func, (1..steps + 1).map(|di| (i + di, j)));
+                        self.iterate(func, (1..=*steps).map(|di| (i + di, j)));
                     } else {
                         self.iterate(func, (*steps..0).rev().map(|di| (i + di, j)));
                     }
@@ -121,7 +121,7 @@ impl Grid {
                 }
                 Dir::Vertical => {
                     if *steps >= 0 {
-                        self.iterate(func, (1..steps + 1).map(|dj| (i, j + dj)));
+                        self.iterate(func, (1..=*steps).map(|dj| (i, j + dj)));
                     } else {
                         self.iterate(func, (*steps..0).rev().map(|dj| (i, j + dj)));
                     };
@@ -162,7 +162,7 @@ fn solve(dist_func: &mut dyn FnMut((i32, i32), u32, u32) -> i32) -> Option<i32> 
             }
         });
     }
-    return min_distance;
+    min_distance
 }
 
 fn solve1() -> Option<i32> {

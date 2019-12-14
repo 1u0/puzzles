@@ -226,12 +226,11 @@ struct NoIo {}
 
 impl Io for NoIo {
     fn input(&mut self) -> Byte {
-        assert!(false, "unexpected input request");
-        unreachable!()
+        panic!("unexpected input request")
     }
 
     fn output(&mut self, _: Byte) {
-        assert!(false, "unexpected output request");
+        panic!("unexpected output request");
     }
 }
 
@@ -274,7 +273,7 @@ pub fn run_code_with_inputs(code: Vec<Byte>, inputs: Vec<Byte>) -> Vec<Byte> {
 pub fn parse_code(input: &str) -> Vec<Byte> {
     input
         .trim()
-        .split(",")
+        .split(',')
         .map(|str| str.parse().unwrap())
         .collect()
 }
