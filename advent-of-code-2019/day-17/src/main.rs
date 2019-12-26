@@ -1,3 +1,4 @@
+use intcode::Byte;
 use std::char;
 
 struct Grid {
@@ -41,19 +42,15 @@ impl Grid {
     }
 }
 
-fn load_grid() -> Grid {
-    let code = intcode::load_code();
-    let output = intcode::run_code_with_inputs(code, Vec::new());
+fn solve1(code: &[Byte]) {
+    let output = intcode::run_code_with_inputs(code.to_vec(), Vec::new());
     let grid = output
         .split(|v| *v == '\n' as intcode::Byte)
         .map(|row| row.iter().map(|v| *v as u8).collect::<Vec<_>>())
         .filter(|row| !row.is_empty())
         .collect();
-    Grid::new(grid)
-}
 
-fn main() {
-    let grid = load_grid();
+    let grid = Grid::new(grid);
     let (n, m) = grid.get_size();
     let mut result = 0;
     for i in 0..n {
@@ -63,5 +60,34 @@ fn main() {
             }
         }
     }
-    println!("{}", result);
+    println!("Result for task 1: {}", result);
+}
+
+fn solve2(code: &[Byte]) {
+    let mut code = code.to_vec();
+    code[0] = 2;
+    let instructions = "\
+A,B,A,B,C,C,B,A,B,C
+L,12,L,10,R,8,L,12
+R,8,R,10,R,12
+L,10,R,12,R,8
+n
+    ";
+    let output = intcode::run_code_with_inputs(
+        code,
+        instructions.chars().rev().map(|ch| ch as Byte).collect(),
+    );
+    for v in output.iter() {
+        if let Some(ch) = char::from_u32(*v as u32) {
+            print!("{}({})", ch, v);
+        } else {
+            println!("{}", v);
+        }
+    }
+}
+
+fn main() {
+    let code = intcode::load_code();
+    solve1(&code);
+    solve2(&code);
 }
