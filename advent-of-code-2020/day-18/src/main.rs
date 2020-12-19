@@ -51,120 +51,112 @@ fn load_expressions() -> Vec<Vec<Token>> {
     result
 }
 
-fn eval1(expression: &[Token]) -> i64 {
-    fn eval_rec(expression: &[Token], i: &mut usize) -> i64 {
-        let mut result = -1;
-        let mut op = None;
+enum Op {
+    Plus,
+    Mult,
+}
+
+trait NumericEval: Default {
+    fn set(&mut self, value: i64);
+    fn push_op(&mut self, op: Op, value: i64);
+    fn get_result(&self) -> i64;
+}
+
+#[derive(Default)]
+struct Eval1 {
+    result: i64,
+}
+
+impl NumericEval for Eval1 {
+    fn set(&mut self, value: i64) {
+        self.result = value;
+    }
+
+    fn push_op(&mut self, op: Op, value: i64) {
+        match op {
+            Op::Plus => self.result += value,
+            Op::Mult => self.result *= value,
+        };
+    }
+
+    fn get_result(&self) -> i64 {
+        self.result
+    }
+}
+
+#[derive(Default)]
+struct Eval2 {
+    values: Vec<i64>,
+}
+
+impl NumericEval for Eval2 {
+    fn set(&mut self, value: i64) {
+        assert!(self.values.is_empty());
+        self.values.push(value);
+    }
+
+    fn push_op(&mut self, op: Op, value: i64) {
+        let i = self.values.len() - 1;
+        match op {
+            Op::Plus => self.values[i] += value,
+            Op::Mult => self.values.push(value),
+        }
+    }
+
+    fn get_result(&self) -> i64 {
+        self.values.iter().product()
+    }
+}
+
+fn eval<State: NumericEval>(expression: &[Token]) -> i64 {
+    fn eval_rec<State: NumericEval>(expression: &[Token], i: &mut usize) -> i64 {
+        let mut state = State::default();
+        let mut last_op = None;
         while *i < expression.len() {
             *i += 1;
             match expression[*i - 1] {
                 Token::LPar => {
-                    let num = eval_rec(expression, i);
+                    let value = eval_rec::<State>(expression, i);
                     *i += 1;
-                    if result == -1 {
-                        result = num;
-                    } else {
-                        match op {
-                            Some(Token::Plus) => result += num,
-                            Some(Token::Mult) => result *= num,
-                            _ => panic!("invalid state"),
+                    match last_op {
+                        Some(op) => {
+                            state.push_op(op, value);
+                            last_op = None;
                         }
-                        op = None;
+                        None => state.set(value),
                     }
                 }
                 Token::RPar => {
                     *i -= 1;
                     break;
                 }
-                Token::Number(num) => {
-                    if result == -1 {
-                        result = num;
-                    } else {
-                        match op {
-                            Some(Token::Plus) => result += num,
-                            Some(Token::Mult) => result *= num,
-                            _ => panic!("invalid state"),
-                        }
-                        op = None;
+                Token::Number(value) => match last_op {
+                    Some(op) => {
+                        state.push_op(op, value);
+                        last_op = None;
                     }
-                }
-                Token::Plus => op = Some(Token::Plus),
-                Token::Mult => op = Some(Token::Mult),
+                    None => state.set(value),
+                },
+                Token::Plus => last_op = Some(Op::Plus),
+                Token::Mult => last_op = Some(Op::Mult),
             }
         }
-        result
+        state.get_result()
     }
     let mut i = 0;
-    eval_rec(expression, &mut i)
+    eval_rec::<State>(expression, &mut i)
 }
 
-fn solve1(expressions: &[Vec<Token>]) {
+fn solve<State: NumericEval>(expressions: &[Vec<Token>]) {
     let result: i64 = expressions
         .iter()
-        .map(|expression| eval1(&expression))
-        .sum();
-    println!("Result {}", result);
-}
-
-fn eval2(expression: &[Token]) -> i64 {
-    fn eval_rec(expression: &[Token], i: &mut usize) -> i64 {
-        let mut values = Vec::new();
-        let mut op = None;
-        while *i < expression.len() {
-            *i += 1;
-            match expression[*i - 1] {
-                Token::LPar => {
-                    let num = eval_rec(expression, i);
-                    *i += 1;
-                    if values.is_empty() {
-                        values.push(num);
-                    } else {
-                        let i = values.len() - 1;
-                        match op {
-                            Some(Token::Plus) => values[i] += num,
-                            Some(Token::Mult) => values.push(num),
-                            _ => panic!("invalid state"),
-                        }
-                        op = None;
-                    }
-                }
-                Token::RPar => {
-                    *i -= 1;
-                    break;
-                }
-                Token::Number(num) => {
-                    if values.is_empty() {
-                        values.push(num);
-                    } else {
-                        let i = values.len() - 1;
-                        match op {
-                            Some(Token::Plus) => values[i] += num,
-                            Some(Token::Mult) => values.push(num),
-                            _ => panic!("invalid state"),
-                        }
-                        op = None;
-                    }
-                }
-                Token::Plus => op = Some(Token::Plus),
-                Token::Mult => op = Some(Token::Mult),
-            }
-        }
-        values.iter().product()
-    }
-    let mut i = 0;
-    eval_rec(expression, &mut i)
-}
-
-fn solve2(expressions: &[Vec<Token>]) {
-    let result: i64 = expressions
-        .iter()
-        .map(|expression| eval2(&expression))
+        .map(|expression| eval::<State>(&expression))
         .sum();
     println!("Result {}", result);
 }
 
 fn main() {
     let expressions = load_expressions();
-    solve1(&expressions);
-    solve2(&expressions);
+    solve::<Eval1>(&expressions);
+    solve::<Eval2>(&expressions);
 }
