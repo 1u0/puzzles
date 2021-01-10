@@ -1,8 +1,7 @@
-use std::io::stdin;
-use std::io::BufRead;
+use std::io::{self, BufRead};
 
 fn read_grid() -> Vec<Vec<char>> {
-    stdin()
+    io::stdin()
         .lock()
         .lines()
         .map(|line| line.unwrap().chars().collect())
@@ -10,19 +9,12 @@ fn read_grid() -> Vec<Vec<char>> {
 }
 
 fn count_trees_on_slope(grid: &[Vec<char>], dx: usize, dy: usize) -> i64 {
-    let n = grid.len();
     let m = grid[0].len();
-    let mut x = 0;
-    let mut y = 0;
-    let mut count = 0;
-    while x < n {
-        if grid[x][y] == '#' {
-            count += 1;
-        }
-        x += dx;
-        y = (y + dy) % m;
-    }
-    return count;
+    grid.iter()
+        .step_by(dx)
+        .enumerate()
+        .filter(|(x, row)| row[x * dy % m] == '#')
+        .count() as i64
 }
 
 fn solve1(grid: &[Vec<char>]) {
